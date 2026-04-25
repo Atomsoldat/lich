@@ -17,8 +17,8 @@ var rootCmd = &cobra.Command{
 	Short: "Lich: kubernetes GitOps workflow assistant",
 	Long: `Lich automates the GitOps workflow for kustomize-based Kubernetes manifests.
 
-It detects renovate branches, rerenders manifests via kustomize, and manages
-the git workflow (commit, rebase, push, merge, ...) so the rendered output stays in sync
+It detects renovate branches, renders manifests via kustomize, and manages
+the git workflow (commit, rebase, push, merge, ...) so the rendered output 
 with upstream chart updates.
 
 External dependencies: git, kustomize`,
