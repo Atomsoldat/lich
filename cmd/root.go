@@ -9,7 +9,7 @@ import (
 
 var (
 	cfgFile       string
-	noInteractive bool
+	nonInteractive bool
 )
 
 var rootCmd = &cobra.Command{
@@ -36,7 +36,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "",
 		"config file (default: $HOME/.config/lich/config.yaml or ./lichconfig.yaml)")
-	rootCmd.PersistentFlags().BoolVar(&noInteractive, "no-interactive", false,
+	rootCmd.PersistentFlags().BoolVar(&nonInteractive, "no-interactive", false,
 		"disable interactive prompts; auto-enabled when stdin is not a TTY")
 }
 
@@ -66,7 +66,7 @@ func initConfig() {
 // IsInteractive reports whether the tool is running in an interactive terminal.
 // The --no-interactive flag overrides the auto-detection.
 func IsInteractive() bool {
-	if noInteractive {
+	if nonInteractive {
 		return false
 	}
 	fi, err := os.Stdin.Stat()
@@ -74,4 +74,4 @@ func IsInteractive() bool {
 		return false
 	}
 	return fi.Mode()&os.ModeCharDevice != 0
-}github.com/spf13/viper
+}
