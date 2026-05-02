@@ -5,8 +5,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"context"
 
 	"github.com/spf13/cobra"
+	"go.lichturm.de/lich/internal/kustomize"
 	"go.lichturm.de/lich/internal/lich"
 )
 
@@ -17,7 +19,6 @@ const outputDir string = "manifests"
 var (
 	animateComponents []string
 )
-
 
 var workBatch []lich.UnitOfWork
 
@@ -92,9 +93,23 @@ Examples:
 
 		return nil
 	},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		println("I am the run block")
-		// for each unit of work, run kustomize build
+		// for each unit of work, run kustomize build in a separate context
+		// subordinate to the main context
+		// not sure what kind of context is best here yet
+		// TODO: think about that
+		for _, uow := range workBatch {
+		    ctx, cancel := context.WithCancel(cmd.Context())
+		    defer cancel()
+			
+			err := kustomize.Build(ctx, uow)
+			if err != nil {
+				return err
+			}
+		}
+		
+		return nil
 	},
 }
 
