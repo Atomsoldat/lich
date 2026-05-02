@@ -2,7 +2,7 @@ package kustomize
 
 import "os/exec"
 import "context"
-import 	"go.lichturm.de/lich/internal/lich"
+import "go.lichturm.de/lich/internal/lich"
 import "fmt"
 import "path/filepath"
 import "os"
@@ -15,7 +15,7 @@ func Build(ctx context.Context, uow lich.UnitOfWork) error {
 		"build",
 		"--enable-helm",
 		"--output", filepath.Join(uow.Destination, "manifests.yaml"),
-        uow.Origin,
+		uow.Origin,
 	)
 
 	err := os.MkdirAll(uow.Destination, 0750)

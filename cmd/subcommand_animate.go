@@ -1,11 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"context"
 
 	"github.com/spf13/cobra"
 	"go.lichturm.de/lich/internal/kustomize"
@@ -100,15 +100,15 @@ Examples:
 		// not sure what kind of context is best here yet
 		// TODO: think about that
 		for _, uow := range workBatch {
-		    ctx, cancel := context.WithCancel(cmd.Context())
-		    defer cancel()
-			
+			ctx, cancel := context.WithCancel(cmd.Context())
+			defer cancel()
+
 			err := kustomize.Build(ctx, uow)
 			if err != nil {
 				return err
 			}
 		}
-		
+
 		return nil
 	},
 }

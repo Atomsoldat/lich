@@ -92,4 +92,3 @@ func TestParseBranches_DifferentRemote(t *testing.T) {
 		t.Errorf("unexpected branch: %s", mrs[0].Branch)
 	}
 }
-
