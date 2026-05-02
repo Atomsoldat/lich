@@ -94,7 +94,6 @@ Examples:
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		println("I am the run block")
 		// for each unit of work, run kustomize build in a separate context
 		// subordinate to the main context
 		// not sure what kind of context is best here yet
