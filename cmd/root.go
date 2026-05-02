@@ -7,8 +7,12 @@ import (
 	"github.com/spf13/viper"
 )
 
+import "context"
+import "syscall"
+import "os/signal"
+
 var (
-	cfgFile       string
+	cfgFile        string
 	nonInteractive bool
 )
 
@@ -24,9 +28,17 @@ with upstream chart updates.
 External dependencies: git, kustomize`,
 }
 
-// Execute is the entry point called from main.
+// Execute is the entry point called from main.go
+// this has nothing to do with cobra yet
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	// define a root context that will listen for CTRL+C to abort
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	// execute our cobra command, using that context
+	// cobra will pass the context along to all subcommands
+	// who can then use it via cmd.Context()
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		os.Exit(1)
 	}
 }
