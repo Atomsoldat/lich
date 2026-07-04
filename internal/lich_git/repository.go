@@ -1,4 +1,4 @@
-package git
+package lich_git
 
 import (
 	"fmt"
@@ -7,8 +7,14 @@ import (
 	"github.com/go-git/go-git/v6/plumbing"
 )
 
-func displayBranches(repo *git.Repository) (error) {
-	branches, _ := repo.Branches()
+func DisplayBranches(repo *git.Repository) (error) {
+	branches, err := repo.Branches()
+	if err != nil {
+		return fmt.Errorf(
+			"failed fetching repo branches: %w",
+			err,
+		)
+	}
 	branches.ForEach(func(branch *plumbing.Reference) error {
 		fmt.Println(branch.Hash().String(), branch.Name())
 		// ForEach expects a callback returning an error
@@ -17,7 +23,7 @@ func displayBranches(repo *git.Repository) (error) {
 	return nil
 }
 
-func fetchRemote(repo *git.Repository) (error) {
+func FetchRemote(repo *git.Repository) (error) {
 	// https://pkg.go.dev/github.com/go-git/go-git/v6#FetchOptions
 	fetchopts := git.FetchOptions{
 		// default to origin
