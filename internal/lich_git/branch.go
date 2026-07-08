@@ -10,6 +10,11 @@ import (
 
 // this function should result in the same output as
 // git branch --no-merged master
+// ACTUALLY, this one seems better for our intended use case
+// git branch --remote --no-merged master
+// with that, we get unmerged remote branches
+// now how do we get go-git to do the same?
+
 // TODO: what about the linux-kernel(TM)?
 func CollectUnmergedBranches(
 	headCommit *object.Commit,
