@@ -1,4 +1,5 @@
 workbench
 components
 lich
+!internal/lich
 cov.out
