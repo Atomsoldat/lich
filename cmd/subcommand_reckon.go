@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"go.lichturm.de/lich/internal/lich"
+	"go.lichturm.de/lich/internal/reckon"
 )
 
 var (
@@ -34,7 +34,7 @@ Examples:
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-	err := lich.Reckon()
+	err := reckon.TuiWorkflow()
 	if err != nil {
 		return fmt.Errorf(
 			"could not execute reckon subcommand: %w",

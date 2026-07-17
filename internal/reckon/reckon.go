@@ -1,4 +1,4 @@
-package lich
+package reckon
 
 import (
 	"fmt"
@@ -13,22 +13,24 @@ import (
 // Reckon fetches all references from the remote repository
 // It then compares all remote branch references to the master branch
 // Unmerged remote branch references will be printed to stdout
-func Reckon() error {
-	
+func FindUnmergedRemoteBranches() (error, []plumbing.Reference) {
+
 	pwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf(
-			"could not determine working directory: %w",
-			err,
-		)
+				"could not determine working directory: %w",
+				err,
+			),
+			nil
 	}
-	
+
 	path, err := lich_git.FindGitDirParent(pwd)
 	if err != nil {
 		return fmt.Errorf(
-			"could not determine repo directory: %w",
-			err,
-		)
+				"could not determine repo directory: %w",
+				err,
+			),
+			nil
 	}
 
 	// TODO: hardcoded path needs to be properly determined
@@ -42,10 +44,11 @@ func Reckon() error {
 	repo, err := git.PlainOpen(path)
 	if err != nil {
 		return fmt.Errorf(
-			"failed opening repo at path %s: %w",
-			path,
-			err,
-		)
+				"failed opening repo at path %s: %w",
+				path,
+				err,
+			),
+			nil
 	}
 	defer repo.Close()
 
@@ -68,9 +71,10 @@ func Reckon() error {
 	references, err := repo.References()
 	if err != nil {
 		return fmt.Errorf(
-			"failed getting repo references: %w",
-			err,
-		)
+				"failed getting repo references: %w",
+				err,
+			),
+			nil
 	}
 
 	// TODO:  we probably want to make this configurable
@@ -79,19 +83,21 @@ func Reckon() error {
 	headRef, err := repo.Head()
 	if err != nil {
 		return fmt.Errorf(
-			"failed getting HEAD reference: %w",
-			err,
-		)
+				"failed getting HEAD reference: %w",
+				err,
+			),
+			nil
 	}
 
 	headCommit, err := repo.CommitObject((*headRef).Hash())
 	if err != nil {
 		return fmt.Errorf(
-			"failed to determine commit belonging to hash %s, name %s: %w",
-			(*headRef).Hash(),
-			(*headRef).Name(),
-			err,
-		)
+				"failed to determine commit belonging to hash %s, name %s: %w",
+				(*headRef).Hash(),
+				(*headRef).Name(),
+				err,
+			),
+			nil
 	}
 
 	// TODO: the size of the slice affects our print statement below (empty lines)
@@ -116,14 +122,16 @@ func Reckon() error {
 		// This is the local branch variant, in case we need it later
 		//if ref.Name().IsBranch() { ... }
 
-		if ref.Name().IsRemote() {
-			err = lich_git.CollectUnmergedBranches(headCommit, ref, repo, &unmergedBranches)
-		}
-		
+		// TODO: make filtering for local / remote a cli option
+		//if ref.Name().IsRemote() {
+		//	err = lich_git.CollectUnmergedBranches(headCommit, ref, repo, &unmergedBranches)
+		//}
+		err = lich_git.CollectUnmergedBranches(headCommit, ref, repo, &unmergedBranches)
+
 		return nil
 	})
 	if err != nil {
-		return err
+		return err, nil
 	}
 
 	// do stuff with branches
@@ -137,5 +145,5 @@ func Reckon() error {
 	// TODO: in the future, we might want to clean up merged branches locally and in the remote
 	// we could make that an optional configuration
 
-	return nil
+	return nil, unmergedBranches
 }
