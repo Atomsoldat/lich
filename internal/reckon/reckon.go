@@ -2,9 +2,7 @@ package reckon
 
 import (
 	"fmt"
-	"os"
 
-	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
 
 	"go.lichturm.de/lich/internal/lich_git"
@@ -14,38 +12,10 @@ import (
 // It then compares all remote branch references to the master branch
 // Unmerged remote branch references will be printed to stdout
 func FindUnmergedRemoteBranches() (error, []plumbing.Reference) {
-
-	pwd, err := os.Getwd()
+	repo, err := lich_git.OpenRepo()
 	if err != nil {
 		return fmt.Errorf(
-				"could not determine working directory: %w",
-				err,
-			),
-			nil
-	}
-
-	path, err := lich_git.FindGitDirParent(pwd)
-	if err != nil {
-		return fmt.Errorf(
-				"could not determine repo directory: %w",
-				err,
-			),
-			nil
-	}
-
-	// TODO: hardcoded path needs to be properly determined
-	//path := "/datengruft/programming/MausoleumManagement/private-cloud"
-
-	// there's a more fancy function for when you store the
-	// repo apart from the worktree
-	// seemed a bit overkill to start with
-	// TODO: if we feel like it, try figuring this out later
-	// https://pkg.go.dev/github.com/go-git/go-git/v6#Open
-	repo, err := git.PlainOpen(path)
-	if err != nil {
-		return fmt.Errorf(
-				"failed opening repo at path %s: %w",
-				path,
+				"Failed opening repo: %w",
 				err,
 			),
 			nil

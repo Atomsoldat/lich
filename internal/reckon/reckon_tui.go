@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6"
+        "go.lichturm.de/lich/internal/lich_git"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -23,7 +24,7 @@ var unmergedBranches []plumbing.Reference
 
 // boiler plate so we can return errors in our function
 // go does not allow that in the main() funtion
-func TuiWorkflow(repo git.Repository) error {
+func TuiWorkflow() error {
 	// use long form so we don't shadow the global variable
 	var err error
 	err, unmergedBranches = FindUnmergedRemoteBranches()
@@ -53,6 +54,15 @@ func TuiWorkflow(repo git.Repository) error {
 
 	fmt.Print(selectedBranches)
 
+	repo, err := lich_git.OpenRepo()
+	if err != nil {
+		return fmt.Errorf(
+				"Failed opening repo: %w",
+				err,
+			)
+	}
+	defer repo.Close()
+
 	for i := range selectedBranches {
 	    checkoutBranch(repo, selectedBranches[i])
         }
@@ -60,7 +70,7 @@ func TuiWorkflow(repo git.Repository) error {
 }
 
 
-func checkoutBranch(repo git.Repository, branch plumbing.Reference) (error){
+func checkoutBranch(repo *git.Repository, branch plumbing.Reference) (error){
 
     //we will need to pass or open a Repository instance
     // https://pkg.go.dev/github.com/go-git/go-git/v6#Repository.Worktree

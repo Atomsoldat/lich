@@ -40,10 +40,7 @@ Examples:
 			"could not execute reckon subcommand: %w",
 			err,
 		)
-
 	}
-
-
 		return nil
 	},
 }
