@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -22,7 +23,7 @@ var unmergedBranches []plumbing.Reference
 
 // boiler plate so we can return errors in our function
 // go does not allow that in the main() funtion
-func TuiWorkflow() error {
+func TuiWorkflow(repo git.Repository) error {
 	// use long form so we don't shadow the global variable
 	var err error
 	err, unmergedBranches = FindUnmergedRemoteBranches()
@@ -42,15 +43,51 @@ func TuiWorkflow() error {
 	// Type assertion allows us to access the values in our implementation of the tea.Model interface
 	selections := returnModel.(model).selected
 
-    var selectedBranches []plumbing.Reference
+        var selectedBranches []plumbing.Reference
 
+	// build an array of selected branches using the index of selections to retrieve them
+	// from unmergedBranches
 	for i := range selections {
-        selectedBranches = append(selectedBranches, unmergedBranches[i])
+            selectedBranches = append(selectedBranches, unmergedBranches[i])
 	}
 
 	fmt.Print(selectedBranches)
 
+	for i := range selectedBranches {
+	    checkoutBranch(repo, selectedBranches[i])
+        }
 	return nil
+}
+
+
+func checkoutBranch(repo git.Repository, branch plumbing.Reference) (error){
+
+    //we will need to pass or open a Repository instance
+    // https://pkg.go.dev/github.com/go-git/go-git/v6#Repository.Worktree
+    worktree, err := repo.Worktree()
+    if err != nil {
+        return fmt.Errorf("Failed to fetch repo worktree: %v", err)
+    }
+
+
+    // https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-alpha.5/plumbing#Reference.Name
+    branchName := branch.Name()
+
+
+    checkoutOptions :=  new(git.CheckoutOptions)
+    checkoutOptions.Keep = true
+    // https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-alpha.5/plumbing#ReferenceName
+    checkoutOptions.Branch = branchName // we need a plumbing.ReferenceName here , alternatively a plumbing.Hash
+
+
+    // for this to work, we need a Worktree struct
+    // the worktree is also the thingy that can git add, git commit, git pull, git grep
+    // https://pkg.go.dev/github.com/go-git/go-git/v6#Worktree
+    // https://pkg.go.dev/github.com/go-git/go-git/v6#Worktree.Checkout
+    worktree.Checkout(checkoutOptions)
+    fmt.Println("DEBUG: Checked out branch")
+
+    return nil
 }
 
 // this is bubbletea's initial state
