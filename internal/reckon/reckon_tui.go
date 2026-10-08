@@ -3,9 +3,9 @@ package reckon
 import (
 	"fmt"
 
-	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6"
-        "go.lichturm.de/lich/internal/lich_git"
+	"github.com/go-git/go-git/v6/plumbing"
+	"go.lichturm.de/lich/internal/lich_git"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -44,60 +44,95 @@ func TuiWorkflow() error {
 	// Type assertion allows us to access the values in our implementation of the tea.Model interface
 	selections := returnModel.(model).selected
 
-        var selectedBranches []plumbing.Reference
+	var selectedBranches []plumbing.Reference
 
 	// build an array of selected branches using the index of selections to retrieve them
 	// from unmergedBranches
 	for i := range selections {
-            selectedBranches = append(selectedBranches, unmergedBranches[i])
+		selectedBranches = append(selectedBranches, unmergedBranches[i])
 	}
-
-	fmt.Print(selectedBranches)
 
 	repo, err := lich_git.OpenRepo()
 	if err != nil {
 		return fmt.Errorf(
-				"Failed opening repo: %w",
-				err,
-			)
+			"Failed opening repo: %w",
+			err,
+		)
 	}
 	defer repo.Close()
 
 	for i := range selectedBranches {
-	    checkoutBranch(repo, selectedBranches[i])
-        }
+		err = checkoutBranch(repo, selectedBranches[i])
+	    if err != nil {
+	    	return fmt.Errorf("Failed to check out branch %v: %v", selectedBranches[i].Name(), err)
+	    }
+	}
 	return nil
 }
 
+func checkoutBranch(repo *git.Repository, branch plumbing.Reference) error {
 
-func checkoutBranch(repo *git.Repository, branch plumbing.Reference) (error){
+	//we will need to pass or open a Repository instance
+	// https://pkg.go.dev/github.com/go-git/go-git/v6#Repository.Worktree
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("Failed to fetch repo worktree: %v", err)
+	}
 
-    //we will need to pass or open a Repository instance
-    // https://pkg.go.dev/github.com/go-git/go-git/v6#Repository.Worktree
-    worktree, err := repo.Worktree()
-    if err != nil {
-        return fmt.Errorf("Failed to fetch repo worktree: %v", err)
-    }
+	// https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-alpha.5/plumbing#Reference.Name
+	branchName := branch.Name()
+	branchHash := branch.Hash()
+
+	checkoutOptions := new(git.CheckoutOptions)
+	// since we do not set Force = true, we can not clobber local changes
+	// in this case, this simply means "don't carry over changed, committed stuff
+	// to the working tree when checking out the other branch"
+	checkoutOptions.Keep = false
+
+	localName := branchName
+	fmt.Printf("DEBUG: passed branchName: %v\n", localName)
+
+	// TODO: we currently don't strip the "origin" element of a reference like refs/heads/origin/hello-world
+	// that means that our local branch, that we create is prefixed with "origin/"
+	// that means that our check for whether a given local branch exists, looks in the wrong place
+	if branchName.IsRemote() {
+	    fmt.Printf("DEBUG: Branch is remote\n")
+		shortName := branchName.Short()
+	    fmt.Printf("DEBUG: shortName: %v\n", shortName)
+		localName = plumbing.NewBranchReferenceName(shortName)
+	    fmt.Printf("DEBUG: localName: %v\n", localName)
+	} else {
+	    fmt.Printf("DEBUG: Branch is local\n")
+	}
+
+	// try building a reference with the given branch name; if that fails, the branch already exists
+	_, err = repo.Reference(plumbing.NewBranchReferenceName(localName.String()), false)
+	if err == nil {
+	    fmt.Printf("DEBUG: Branch %v exists locally already\n", localName)
+	    checkoutOptions.Branch = localName 
+	    checkoutOptions.Create = false
+
+	} else {
+	    // https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-alpha.5/plumbing#ReferenceName
+        // we need a plumbing.ReferenceName here , alternatively a plumbing.Hash
+	    fmt.Printf("DEBUG: Branch %v does not exist locally\n", localName)
+	    checkoutOptions.Branch = localName 
+	    checkoutOptions.Hash = branchHash
+	    checkoutOptions.Create = true
+	}
 
 
-    // https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-alpha.5/plumbing#Reference.Name
-    branchName := branch.Name()
+	// for this to work, we need a Worktree struct
+	// the worktree is also the thingy that can git add, git commit, git pull, git grep
+	// https://pkg.go.dev/github.com/go-git/go-git/v6#Worktree
+	// https://pkg.go.dev/github.com/go-git/go-git/v6#Worktree.Checkout
+	err = worktree.Checkout(checkoutOptions)
+	if err != nil {
+		return fmt.Errorf("Failed to check out desired branch %v: %v",  localName, err)
+	}
+	fmt.Println("DEBUG: Checked out branch")
 
-
-    checkoutOptions :=  new(git.CheckoutOptions)
-    checkoutOptions.Keep = true
-    // https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-alpha.5/plumbing#ReferenceName
-    checkoutOptions.Branch = branchName // we need a plumbing.ReferenceName here , alternatively a plumbing.Hash
-
-
-    // for this to work, we need a Worktree struct
-    // the worktree is also the thingy that can git add, git commit, git pull, git grep
-    // https://pkg.go.dev/github.com/go-git/go-git/v6#Worktree
-    // https://pkg.go.dev/github.com/go-git/go-git/v6#Worktree.Checkout
-    worktree.Checkout(checkoutOptions)
-    fmt.Println("DEBUG: Checked out branch")
-
-    return nil
+	return nil
 }
 
 // this is bubbletea's initial state
