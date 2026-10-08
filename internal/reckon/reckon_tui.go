@@ -180,7 +180,8 @@ func (m model) View() tea.View {
 		}
 
 		// Render the row
-		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice.Strings())
+		//s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice.Strings())
+		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice.Name().Short())
 	}
 
 	// The footer
