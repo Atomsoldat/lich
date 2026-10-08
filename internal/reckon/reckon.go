@@ -104,13 +104,11 @@ func FindUnmergedRemoteBranches() (error, []plumbing.Reference) {
 		return err, nil
 	}
 
-	// do stuff with branches
-	// TODO: we should probably skip empty branch entries or just prevent them from
-	// even showing up in the slice
-	fmt.Println("INFO: Determined unmerged branches:")
-	for _, branch := range unmergedBranches {
-		fmt.Printf("%s\n", branch.Name())
-	}
+	// For Debugging, print branches
+	//fmt.Println("INFO: Determined unmerged branches:")
+	//for _, branch := range unmergedBranches {
+	//	fmt.Printf("%s\n", branch.Name())
+	//}
 
 	// TODO: in the future, we might want to clean up merged branches locally and in the remote
 	// we could make that an optional configuration
