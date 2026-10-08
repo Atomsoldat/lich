@@ -74,10 +74,12 @@ func TuiWorkflow() error {
 // get all remotes from .git/config
 // from there, get each remote's fetch refspecs
 // for each one
-//     flip that refspec
-//     if the provided remote ReferenceName matches the source side of our flipped refspec
-//     that means we have the correct remote out of our possibly big bunch of remotes
-//     we can then  grab the correct local ref name from the destination side of the flipped refspec
+//
+//	flip that refspec
+//	if the provided remote ReferenceName matches the source side of our flipped refspec
+//	that means we have the correct remote out of our possibly big bunch of remotes
+//	we can then  grab the correct local ref name from the destination side of the flipped refspec
+//
 // we end up returning either a local ref name (that may or may not exist yet) , or an error, if remoteRef belongs to no configured remote
 func localBranchName(repo *git.Repository, remoteRef plumbing.ReferenceName) (plumbing.ReferenceName, error) {
 	remotes, err := repo.Remotes()
@@ -89,7 +91,7 @@ func localBranchName(repo *git.Repository, remoteRef plumbing.ReferenceName) (pl
 			// https://git-scm.com/book/en/v2/Git-Internals-The-Refspec
 			// https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-beta.1/config#RefSpec
 			// a refspec is a renaming rule in .git/config or git commands
-			// its purpose is to map refs from a source to a destination 
+			// its purpose is to map refs from a source to a destination
 			// it mainly consists out of two patterns separated by a colon
 			// `src:dst`
 			//
@@ -98,17 +100,17 @@ func localBranchName(repo *git.Repository, remoteRef plumbing.ReferenceName) (pl
 			// it's how the remote thinks about a branch
 			// dst is the ref pattern matching a local, remote-tracking ref, it's how we will think about that branch
 			// that's how git knows how to call different remote server's branches locally
-            //
+			//
 			// in push refspecs
 			// src is a ref pattern to a local ref (e.g. a branch)
 			// dst is a ref pattern matching a branch in the remote
 			//
 			// example (fetch refspec):
-            //
-            // [remote "origin"]
-            //     url = git@github.com:MausoleumManagement/private-cloud.git
-            //     fetch = +refs/heads/*:refs/remotes/origin/*
-            //
+			//
+			// [remote "origin"]
+			//     url = git@github.com:MausoleumManagement/private-cloud.git
+			//     fetch = +refs/heads/*:refs/remotes/origin/*
+			//
 			// `+` is related to updates
 			// basically, it means "it's okay to  update to a non fast-forward change,
 			// just jump to whatever the remote is doing, because that is a remote branch,
@@ -136,49 +138,56 @@ func checkoutBranch(repo *git.Repository, branch plumbing.Reference) error {
 		return fmt.Errorf("Failed to fetch repo worktree: %v", err)
 	}
 
+	// TODO: symbolic refs like origin/HEAD  should be resolved for super correctness
+	// Use case?
 	// https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-alpha.5/plumbing#Reference.Name
 	branchName := branch.Name()
-	branchHash := branch.Hash()
-	newLocalName, err := localBranchName(repo, branchName)
-	if err != nil {
-		return fmt.Errorf("Failed to determine local branch name: %v", err)
+
+	localName := branchName
+
+	if branchName.IsRemote() {
+		// resolve proper local name for provided remote branch
+		localName, err = localBranchName(repo, branchName)
+		if err != nil {
+			return fmt.Errorf("Failed to determine local branch name: %v", err)
+		}
+	} else {
+		localName = branchName
 	}
-	fmt.Printf("DEBUG: newLocalName is: %v\n", newLocalName)
+	fmt.Printf("DEBUG: localName is: %v\n", localName)
 
 	checkoutOptions := new(git.CheckoutOptions)
 	// since we do not set Force = true, we can not clobber local changes
 	// in this case, this simply means "don't carry over changed, committed stuff
 	// to the working tree when checking out the other branch"
+	// we also fail on uncommited changes
 	checkoutOptions.Keep = false
+	checkoutOptions.Force = false
 
-	localName := branchName
 	fmt.Printf("DEBUG: passed branchName: %v\n", localName)
 
-	// TODO: we currently don't strip the "origin" element of a reference like refs/heads/origin/hello-world
-	// that means that our local branch, that we create is prefixed with "origin/"
-	// that means that our check for whether a given local branch exists, looks in the wrong place
-	if branchName.IsRemote() {
-		fmt.Printf("DEBUG: Branch is remote\n")
-		shortName := branchName.Short()
-		fmt.Printf("DEBUG: shortName: %v\n", shortName)
-		localName = plumbing.NewBranchReferenceName(shortName)
-		fmt.Printf("DEBUG: localName: %v\n", localName)
-	} else {
-		fmt.Printf("DEBUG: Branch is local\n")
-	}
-
-	// try building a reference with the given branch name; if that fails, the branch already exists
-	_, err = repo.Reference(plumbing.NewBranchReferenceName(newLocalName.String()), false)
+	// try getting a reference for our referenceName; if that succeeds, the branch already exists locally
+	_, err = repo.Reference(localName, false)
 	if err == nil {
-		fmt.Printf("DEBUG: Branch %v exists locally already\n", newLocalName)
-		checkoutOptions.Branch = newLocalName
+		fmt.Printf("DEBUG: Branch %v exists locally already\n", localName)
+		checkoutOptions.Branch = localName
 		checkoutOptions.Create = false
 
 	} else {
 		// https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-alpha.5/plumbing#ReferenceName
 		// we need a plumbing.ReferenceName here , alternatively a plumbing.Hash
-		fmt.Printf("DEBUG: Branch %v does not exist locally\n", newLocalName)
-		checkoutOptions.Branch = newLocalName
+		fmt.Printf("DEBUG: Branch %v does not exist locally\n", localName)
+		checkoutOptions.Branch = localName
+
+		// TODO: for this to work, we need to first figure out whether a given reference is symbolic
+		// resolve the provided references, in case it's a symbolic reference like HEAD
+		// those have no Hash attribute by themselves
+		//resolvedReference, err := repo.Reference(localName, true)
+		//if err != nil {
+		//	return fmt.Errorf("Failed to resolve Reference for branch %v: %v", localName, err)
+		//}
+
+		branchHash := branch.Hash()
 		checkoutOptions.Hash = branchHash
 		checkoutOptions.Create = true
 	}
