@@ -63,11 +63,68 @@ func TuiWorkflow() error {
 
 	for i := range selectedBranches {
 		err = checkoutBranch(repo, selectedBranches[i])
-	    if err != nil {
-	    	return fmt.Errorf("Failed to check out branch %v: %v", selectedBranches[i].Name(), err)
-	    }
+		if err != nil {
+			return fmt.Errorf("Failed to check out branch %v: %v", selectedBranches[i].Name(), err)
+		}
 	}
 	return nil
+}
+
+// in english, what this does is:
+// get all remotes from .git/config
+// from there, get each remote's fetch refspecs
+// for each one
+//     flip that refspec
+//     if the provided remote ReferenceName matches the source side of our flipped refspec
+//     that means we have the correct remote out of our possibly big bunch of remotes
+//     we can then  grab the correct local ref name from the destination side of the flipped refspec
+// we end up returning either a local ref name (that may or may not exist yet) , or an error, if remoteRef belongs to no configured remote
+func localBranchName(repo *git.Repository, remoteRef plumbing.ReferenceName) (plumbing.ReferenceName, error) {
+	remotes, err := repo.Remotes()
+	if err != nil {
+		return "", fmt.Errorf("failed to list remotes: %w", err)
+	}
+	for _, remote := range remotes {
+		for _, refspec := range remote.Config().Fetch {
+			// https://git-scm.com/book/en/v2/Git-Internals-The-Refspec
+			// https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-beta.1/config#RefSpec
+			// a refspec is a renaming rule in .git/config or git commands
+			// its purpose is to map refs from a source to a destination 
+			// it mainly consists out of two patterns separated by a colon
+			// `src:dst`
+			//
+			// in fetch refspecs
+			// src is the ref pattern matching a branch in the remote repo;
+			// it's how the remote thinks about a branch
+			// dst is the ref pattern matching a local, remote-tracking ref, it's how we will think about that branch
+			// that's how git knows how to call different remote server's branches locally
+            //
+			// in push refspecs
+			// src is a ref pattern to a local ref (e.g. a branch)
+			// dst is a ref pattern matching a branch in the remote
+			//
+			// example (fetch refspec):
+            //
+            // [remote "origin"]
+            //     url = git@github.com:MausoleumManagement/private-cloud.git
+            //     fetch = +refs/heads/*:refs/remotes/origin/*
+            //
+			// `+` is related to updates
+			// basically, it means "it's okay to  update to a non fast-forward change,
+			// just jump to whatever the remote is doing, because that is a remote branch,
+			// and we have no local stuff on it"
+
+			// refs/heads/* represents all branches in the remote, the way the remote sees them
+			// (refs/heads is where local branches live in a git repo)
+			// and refs/remotes/origin/* represents all those branches from the remote repo `origin` in our local repo
+			reverse := refspec.Reverse()
+			if reverse.Match(remoteRef) {
+				// Dst returns the "to" name for a given "from" name
+				return reverse.Dst(remoteRef), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no remote fetch refspec matches %v", remoteRef)
 }
 
 func checkoutBranch(repo *git.Repository, branch plumbing.Reference) error {
@@ -82,6 +139,11 @@ func checkoutBranch(repo *git.Repository, branch plumbing.Reference) error {
 	// https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-alpha.5/plumbing#Reference.Name
 	branchName := branch.Name()
 	branchHash := branch.Hash()
+	newLocalName, err := localBranchName(repo, branchName)
+	if err != nil {
+		return fmt.Errorf("Failed to determine local branch name: %v", err)
+	}
+	fmt.Printf("DEBUG: newLocalName is: %v\n", newLocalName)
 
 	checkoutOptions := new(git.CheckoutOptions)
 	// since we do not set Force = true, we can not clobber local changes
@@ -96,31 +158,30 @@ func checkoutBranch(repo *git.Repository, branch plumbing.Reference) error {
 	// that means that our local branch, that we create is prefixed with "origin/"
 	// that means that our check for whether a given local branch exists, looks in the wrong place
 	if branchName.IsRemote() {
-	    fmt.Printf("DEBUG: Branch is remote\n")
+		fmt.Printf("DEBUG: Branch is remote\n")
 		shortName := branchName.Short()
-	    fmt.Printf("DEBUG: shortName: %v\n", shortName)
+		fmt.Printf("DEBUG: shortName: %v\n", shortName)
 		localName = plumbing.NewBranchReferenceName(shortName)
-	    fmt.Printf("DEBUG: localName: %v\n", localName)
+		fmt.Printf("DEBUG: localName: %v\n", localName)
 	} else {
-	    fmt.Printf("DEBUG: Branch is local\n")
+		fmt.Printf("DEBUG: Branch is local\n")
 	}
 
 	// try building a reference with the given branch name; if that fails, the branch already exists
-	_, err = repo.Reference(plumbing.NewBranchReferenceName(localName.String()), false)
+	_, err = repo.Reference(plumbing.NewBranchReferenceName(newLocalName.String()), false)
 	if err == nil {
-	    fmt.Printf("DEBUG: Branch %v exists locally already\n", localName)
-	    checkoutOptions.Branch = localName 
-	    checkoutOptions.Create = false
+		fmt.Printf("DEBUG: Branch %v exists locally already\n", newLocalName)
+		checkoutOptions.Branch = newLocalName
+		checkoutOptions.Create = false
 
 	} else {
-	    // https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-alpha.5/plumbing#ReferenceName
-        // we need a plumbing.ReferenceName here , alternatively a plumbing.Hash
-	    fmt.Printf("DEBUG: Branch %v does not exist locally\n", localName)
-	    checkoutOptions.Branch = localName 
-	    checkoutOptions.Hash = branchHash
-	    checkoutOptions.Create = true
+		// https://pkg.go.dev/github.com/go-git/go-git/v6@v6.0.0-alpha.5/plumbing#ReferenceName
+		// we need a plumbing.ReferenceName here , alternatively a plumbing.Hash
+		fmt.Printf("DEBUG: Branch %v does not exist locally\n", newLocalName)
+		checkoutOptions.Branch = newLocalName
+		checkoutOptions.Hash = branchHash
+		checkoutOptions.Create = true
 	}
-
 
 	// for this to work, we need a Worktree struct
 	// the worktree is also the thingy that can git add, git commit, git pull, git grep
@@ -128,7 +189,7 @@ func checkoutBranch(repo *git.Repository, branch plumbing.Reference) error {
 	// https://pkg.go.dev/github.com/go-git/go-git/v6#Worktree.Checkout
 	err = worktree.Checkout(checkoutOptions)
 	if err != nil {
-		return fmt.Errorf("Failed to check out desired branch %v: %v",  localName, err)
+		return fmt.Errorf("Failed to check out desired branch %v: %v", localName, err)
 	}
 	fmt.Println("DEBUG: Checked out branch")
 
