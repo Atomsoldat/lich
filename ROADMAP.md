@@ -1,0 +1,1 @@
+- [ ] Lich should allow configuring unwanted manifest types and warn the user / refuse to overwrite manifests if they are detected
